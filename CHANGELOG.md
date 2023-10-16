@@ -1,3 +1,23 @@
+### 0.13.14 [2022.08.21]
+* Only depend on `th-lift-instances` for `ghc <= 7.8`.
+
+### 0.13.13 [2022.05.19]
+* Implement `qGetPackageRoot` (introduced in `template-haskell-2.19.0.0`)
+  for the `Quasi` instances defined in `th-orphans`.
+
+### 0.13.12 [2021.08.30]
+* Implement `qGetDoc` and `qPutDoc` (introduced in `template-haskell-2.18.0.0`)
+  for the `Quasi` instances defined in `th-orphans`.
+
+### 0.13.11 [2020.09.29]
+* Allow building with `template-haskell-2.17.0.0` (GHC 9.0).
+* Define `Quote` instances for `ReaderT`, `StateT`, `WriterT`, and `RWST`. In
+  order to define these instances on as many versions of `template-haskell` as
+  possible, this library now depends on the `th-compat` library, which
+  backports the `Quote` class to older versions of `template-haskell`.
+* Backport the `Semigroup`, `Monoid`, and `MonadFix` instances for `Q` that
+  were introduced in `template-haskell-2.17.0.0`.
+
 ### 0.13.10 [2020.04.13]
 * Implement `liftTyped` in the `Lift Bytes` instance.
 

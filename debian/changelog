@@ -1,8 +1,18 @@
-haskell-th-orphans (0.13.10-1-deepin1) unstable; urgency=medium
+haskell-th-orphans (0.13.14-1) unstable; urgency=medium
 
-  * Rebuild
+  [ Ilias Tsitsimpis ]
+  * Declare compliance with Debian policy 4.6.1
 
- -- Deepin Packages Builder <packages@deepin.org>  Thu, 24 Nov 2022 07:19:59 +0800
+  [ Scott Talbert ]
+  * New upstream release
+
+ -- Scott Talbert <swt@techie.net>  Mon, 10 Oct 2022 14:26:05 -0400
+
+haskell-th-orphans (0.13.13-1) unstable; urgency=medium
+
+  * New upstream release
+
+ -- Scott Talbert <swt@techie.net>  Mon, 20 Jun 2022 16:04:31 -0400
 
 haskell-th-orphans (0.13.10-1) unstable; urgency=medium
 
