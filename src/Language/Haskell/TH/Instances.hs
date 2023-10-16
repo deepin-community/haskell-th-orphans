@@ -57,17 +57,21 @@
 -- collisions of orphans between @th-orphans@ and @th-lift-instances@.
 module Language.Haskell.TH.Instances () where
 
-import Language.Haskell.TH
+import Language.Haskell.TH hiding (newName)
 import Language.Haskell.TH.Instances.Internal
 import Language.Haskell.TH.Lift (deriveLiftMany)
 import Language.Haskell.TH.ReifyMany
-import Language.Haskell.TH.Syntax
+import Language.Haskell.TH.Syntax hiding (newName)
+import Language.Haskell.TH.Syntax.Compat (Quote(..))
 
 import Control.Monad.Reader (ReaderT(ReaderT), runReaderT)
 import Control.Monad.RWS (RWST(RWST), runRWST)
 import Control.Monad.State (StateT(StateT), runStateT)
+import qualified Control.Monad.Trans as Trans (MonadTrans(lift))
 import Control.Monad.Writer (WriterT(WriterT), runWriterT)
+#if !MIN_VERSION_base(4,8,0)
 import Instances.TH.Lift ()
+#endif
 
 #if !(MIN_VERSION_template_haskell(2,8,0))
 import Unsafe.Coerce (unsafeCoerce)
@@ -97,7 +101,7 @@ import Control.Monad (ap, liftM)
 # endif
 
 # if !(MIN_VERSION_base(4,8,0))
-import Data.Monoid (Monoid)
+import Data.Monoid (Monoid (..))
 # endif
 
 # if MIN_VERSION_template_haskell(2,3,0) && defined(LANGUAGE_DeriveDataTypeable)
@@ -120,7 +124,22 @@ import qualified Control.Monad.Fail as Fail
 #if MIN_VERSION_template_haskell(2,16,0)
 import GHC.Ptr (Ptr(Ptr))
 import GHC.ForeignPtr (newForeignPtr_)
+import Language.Haskell.TH.Syntax.Compat (liftTypedFromUntypedSplice)
 import System.IO.Unsafe (unsafePerformIO)
+#endif
+
+#if !MIN_VERSION_template_haskell(2,17,0)
+import Control.Applicative (liftA2)
+import Control.Concurrent.MVar (newEmptyMVar, putMVar, readMVar)
+import Control.Monad.Fix (MonadFix (..))
+import System.IO.Unsafe (unsafeInterleaveIO)
+
+import qualified Data.Semigroup as Semi
+
+# if MIN_VERSION_base(4,11,0)
+import Control.Exception (throwIO, catch)
+import GHC.IO.Exception (BlockedIndefinitelyOnMVar (..), FixIOException (..))
+# endif
 #endif
 
 #if !MIN_VERSION_template_haskell(2,11,0)
@@ -386,18 +405,26 @@ instance Applicative PprM where
 deriving instance Bounded Extension
 #endif
 
+instance Quote m => Quote (ReaderT r m) where
+    newName = Trans.lift . newName
 $(deriveQuasiTrans
     [t| forall r m. Quasi m => Proxy2 (ReaderT r m) |]
     [e| \m1 m2 -> ReaderT $ \ r -> runReaderT m1 r `qRecover` runReaderT m2 r |])
 
+instance (Quote m, Monoid w) => Quote (WriterT w m) where
+    newName = Trans.lift . newName
 $(deriveQuasiTrans
     [t| forall w m. (Quasi m, Monoid w) => Proxy2 (WriterT w m) |]
     [e| \m1 m2 -> WriterT $ runWriterT m1 `qRecover` runWriterT m2 |])
 
+instance Quote m => Quote (StateT s m) where
+    newName = Trans.lift . newName
 $(deriveQuasiTrans
     [t| forall s m. Quasi m => Proxy2 (StateT s m) |]
     [e| \m1 m2 -> StateT $ \ s -> runStateT m1 s `qRecover` runStateT m2 s |])
 
+instance (Quote m, Monoid w) => Quote (RWST r w s m) where
+    newName = Trans.lift . newName
 $(deriveQuasiTrans
     [t| forall r w s m. (Quasi m, Monoid w) => Proxy2 (RWST r w s m) |]
     [e| \m1 m2 -> RWST $ \ r s -> runRWST m1 r s `qRecover` runRWST m2 r s |])
@@ -419,7 +446,35 @@ instance Lift Bytes where
     |]
     where
       size = bytesSize bytes
-  liftTyped = unsafeTExpCoerce . lift
+  liftTyped = liftTypedFromUntypedSplice
+#endif
+
+#if !MIN_VERSION_template_haskell(2,17,0)
+instance Semi.Semigroup a => Semi.Semigroup (Q a) where
+  (<>) = liftA2 (Semi.<>)
+
+instance Monoid a => Monoid (Q a) where
+  mempty = return mempty
+#if !MIN_VERSION_base(4,11,0)
+  mappend = liftA2 mappend
+#endif
+
+-- | If the function passed to 'mfix' inspects its argument,
+-- the resulting action will throw a 'FixIOException'
+-- (@base >=4.11@) or a 'BlockedIndefinitelyOnMVar'
+-- with older @base@.
+--
+instance MonadFix Q where
+  mfix k = do
+    m <- runIO newEmptyMVar
+    ans <- runIO (unsafeInterleaveIO (readMVar m
+#if MIN_VERSION_base(4,11,0)
+        `catch` \BlockedIndefinitelyOnMVar -> throwIO FixIOException
+#endif
+        ))
+    result <- k ans
+    runIO (putMVar m result)
+    return result
 #endif
 
 $(reifyManyWithoutInstances ''Lift [''Info, ''Loc] (const True) >>=
